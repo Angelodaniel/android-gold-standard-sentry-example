@@ -1,25 +1,26 @@
 package com.example.androidcustommetricsapp
 
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import io.sentry.Sentry
-import io.sentry.Span
-import io.sentry.ITransaction
-import io.sentry.TransactionOptions
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
-import kotlinx.coroutines.*
-import java.util.*
-import io.sentry.ISpan
-import io.sentry.SentryDate
-import io.sentry.SentryInstantDate
 import java.time.Instant
+import io.sentry.ITransaction
+import io.sentry.ISpan
+import io.sentry.Sentry
+import io.sentry.SentryInstantDate
 
 class AutoTTIDTTFDWithNTSMeasurementActivity : AppCompatActivity() {
     private val client by lazy { OkHttpClient() }
@@ -32,10 +33,26 @@ class AutoTTIDTTFDWithNTSMeasurementActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         tapTime = intent.getLongExtra("tap_time", -1)
-        val screenOrigin = intent.getStringExtra("screen_origin") ?: "unknown"
+        val ntsSpanOp = intent.getStringExtra("nts_span_op") ?: "navigation.to.AutoTTIDTTFDWithNTS"
         val transaction = Sentry.getSpan() as? ITransaction
         screenOpenedTime = System.currentTimeMillis()
-        if (tapTime > 0 && transaction != null) {
+        // Finish the NTS span started in HomeActivity
+        Tracer.stopSpan(ntsSpanOp)
+        // Optionally, create a new NTS span as a child of the current transaction for trace continuity
+        if (transaction != null && tapTime > 0) {
+            val startTimestamp = SentryInstantDate(Instant.ofEpochMilli(tapTime))
+            val ntsSpan = transaction.startChild(
+                "navigation.to.screen",
+                "Navigation to Screen",
+                startTimestamp
+            )
+            ntsSpan.setData("screen_origin", "HomeActivity")
+            ntsSpan.setData("screen_destination", "AutoTTIDTTFDWithNTSMeasurementActivity")
+            // Finish the span at the current time (custom timestamp not supported)
+            ntsSpan.finish()
+        }
+        // Start TTI span for this screen
+        if (transaction != null && tapTime > 0) {
             val fakeStartTime = tapTime - 300
             val startTimestamp = SentryInstantDate(Instant.ofEpochMilli(fakeStartTime))
             screenTTISpan = transaction.startChild(
@@ -43,7 +60,6 @@ class AutoTTIDTTFDWithNTSMeasurementActivity : AppCompatActivity() {
                 "Screen Time to Interactive",
                 startTimestamp
             )
-            screenTTISpan?.setData("screen_origin", screenOrigin)
             // NTS: from tap to screen opened
             val nts = screenOpenedTime - tapTime
             screenTTISpan?.setData("nts_ms", nts)
@@ -110,7 +126,7 @@ class AutoTTIDTTFDWithNTSMeasurementActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        scope.cancel()
+        scope.coroutineContext.cancel()
         super.onDestroy()
     }
 } 

@@ -8,6 +8,8 @@ class MyApp : Application() {
     }
     override fun onCreate() {
         appStartTime = System.currentTimeMillis()
+        // Start span for app start to first screen interactive
+        Tracer.startSpan("app.start_to_first_screen")
         super.onCreate()
     }
 } 
