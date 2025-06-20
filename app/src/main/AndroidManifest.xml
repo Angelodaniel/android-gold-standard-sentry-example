@@ -21,10 +21,13 @@
         <meta-data android:name="io.sentry.debug" android:value="true" />
         <meta-data android:name="io.sentry.traces.sample-rate" android:value="1.0" />
         <meta-data android:name="io.sentry.send-default-pii" android:value="true" />
-        <meta-data android:name="io.sentry.traces.user-interaction.enable" android:value="true" />
+        <meta-data android:name="io.sentry.traces.user-interaction.enable" android:value="false" />
         <meta-data android:name="io.sentry.attach-screenshot" android:value="true" />
         <meta-data android:name="io.sentry.attach-view-hierarchy" android:value="true" />
         <meta-data android:name="io.sentry.traces.time-to-full-display.enable" android:value="true" />
+        <!-- They custom-instrument activites, but we'll add a new flag which will make our auto-instrumentation attach spans to the custom existing one -->
+        <meta-data android:name="io.sentry.traces.activity.enable" android:value="false" />
+
 
         
 
@@ -39,6 +42,18 @@
         </activity>
         <activity android:name=".HomeActivity" />
         <activity android:name=".AutoTTIDTTFDWithNTSMeasurementActivity" />
+        <provider
+            android:authorities="${applicationId}.AppStartProvider"
+            android:name=".AppStartProvider"
+            android:initOrder="999"
+            android:exported="false"
+            />
+        <!-- We init ourselves in the provider above -->
+        <provider
+            android:name="io.sentry.android.core.SentryInitProvider"
+            android:authorities="${applicationId}.SentryInitProvider"
+            tools:node="remove"
+            />
     </application>
 
 </manifest>

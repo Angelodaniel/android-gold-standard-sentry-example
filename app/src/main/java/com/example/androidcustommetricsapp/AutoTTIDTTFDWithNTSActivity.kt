@@ -24,31 +24,9 @@ import java.time.Instant
 class AutoTTIDTTFDWithNTSMeasurementActivity : AppCompatActivity() {
     private val client by lazy { OkHttpClient() }
     private val scope = CoroutineScope(Dispatchers.Main + Job())
-    private var screenOpenedTime: Long = 0
-    private var screenTTISpan: ISpan? = null
-    private var tapTime: Long = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        tapTime = intent.getLongExtra("tap_time", -1)
-        val screenOrigin = intent.getStringExtra("screen_origin") ?: "unknown"
-        val transaction = Sentry.getSpan() as? ITransaction
-        screenOpenedTime = System.currentTimeMillis()
-        if (tapTime > 0 && transaction != null) {
-            val fakeStartTime = tapTime - 300
-            val startTimestamp = SentryInstantDate(Instant.ofEpochMilli(fakeStartTime))
-            screenTTISpan = transaction.startChild(
-                "ui.screen_time_to_interactive",
-                "Screen Time to Interactive",
-                startTimestamp
-            )
-            screenTTISpan?.setData("screen_origin", screenOrigin)
-            // NTS: from tap to screen opened
-            val nts = screenOpenedTime - tapTime
-            screenTTISpan?.setData("nts_ms", nts)
-        }
-
         setContentView(R.layout.activity_screen_v)
 
         val progressBar = findViewById<ProgressBar>(R.id.progressBar)
@@ -88,12 +66,7 @@ class AutoTTIDTTFDWithNTSMeasurementActivity : AppCompatActivity() {
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
                     statusText.text = "All content loaded!"
-                    Sentry.reportFullyDisplayed()
-                    // TTI: from screen opened to fully interactive
-                    val fullyInteractiveTime = System.currentTimeMillis()
-                    val tti = fullyInteractiveTime - screenOpenedTime
-                    screenTTISpan?.setData("tti_ms", tti)
-                    screenTTISpan?.finish() // Finish the custom span after TTFD
+                    Tracer.reportFullyDrawn(this@AutoTTIDTTFDWithNTSMeasurementActivity)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
